@@ -9,7 +9,6 @@ static Token *id(int);
 static Token *cmt(int);
 static Token *lit(int);
 static Token *op(int);
-static Token *sep(int);
 
 static Token *gettoken0(void);
 static int hexval(int);
@@ -18,8 +17,6 @@ Token *gettoken() {
     Token *t;
 
     t = gettoken0();
-    // the keywords first be recongnized as ID, then compare these text with these keywords. in ad word
-    // pick these keywords from these ID 
     if (t && t->sym == ID) {
         kwentry *e = kwlookup(t->text);
         if (e) t->sym = e->sym;
@@ -28,31 +25,26 @@ Token *gettoken() {
 }
 
 static Token *gettoken0() {
-  int ch;
-  Token *t = &tok;   // ????
-  
-  clear_lexeme();
-  ch = nextch();
-  if (ch == EOF) return (Token*)0;   // cast to Token object ???
-  
-  switch (codeof(ch)) {
-  case '+': case '-': case '*': case '/': case '%': case '=':
-  case '<': case '>': case '[': case ']': case '&': case '|': 
-  case '!':
-    t = op(ch); break;
-  case 'Z':
-    t = id(ch); break;
-  case '0': case '9':
-    t = lit(ch); break;
-  case '@': printf("[line %d, pos %d]", getlineno(), getlinepos());
-    t->sym = ' '; break;
-    //  case -1:
-  default:
-    // for these seperator, such as ?, then t->sym = 63
-    t = sep(ch); 
-    break;
-  }
-  return t;
+    int ch;
+    Token *t = &tok;
+
+    clear_lexeme();
+    ch = nextch();
+    if (ch == EOF) return (Token*)0;
+
+    switch (codeof(ch)) {
+        case '+': case '-': case '*': case'/': case '%': case '=':
+            t = op(ch); break;
+        case 'Z':
+            t = id(ch); break;
+        case '0': case '9':
+            t = lit(ch); break;
+        case '@': printf("[line %d, pos %d]", getlineno(), getlinepos());
+            t->sym = ' '; break;
+        default:
+            t->sym = ch;  break;
+    }
+    return t;
 }
 
 static Token *id(int ch) {
@@ -85,85 +77,29 @@ static int hexval(int ch) {
 static Token *op(int ch) {
     Token *t = &tok;
     int ch2;
-    int ch3;
 
     switch (ch) {
-    case '/':
-      outch(ch);
-      // read the next value from line buffer.
-      ch2 = nextch();
-      if (ch2 == '*' || ch2 == '/') {
-        return cmt(ch2);   // then it will not go deeply any more.
-      }
-      // because the sequente character is not used to express a comment, so it should be a number or sth,
-      // now we should restore this value got from line buffer,and also restore the pos. then next time we 
-      // we will also read into this char.
-      backch(ch2);
-      break;
-    case '=':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2 == '='){
-        outch(ch);
-        ch3 = nextch();
-        if (ch3=='='){
+       case '/':
+          outch(ch);
+          ch2 = nextch();
+          if (ch2 == '*' || ch2 == '/') {
+             return cmt(ch2);
+          }
+          backch(ch2);
+          break;
+       case '+':
+       case '-':
+       case '*':
+       case '%':
+       case '=':
           outch(ch);
           break;
-        }
-        backch(ch3);
-        break;
-      }
-      backch(ch2);
-      break;
-    case '+':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='+'){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '-':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='-'){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '*':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='*'){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '%':
-      outch(ch);
-      break;
-    case '<':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='='){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '>':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='='){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    default: 
-      t->sym == ERROR;
-      t->ival = 0;
-      return t;
+       default: 
+          t->sym == ERROR;
+          t->ival = 0;
+          return t;
     }
-    
+
     t->sym = OP;
     t->ival = ch;
     outch(0);
@@ -216,128 +152,74 @@ static Token *lit(int ch) {
     outch(0);
     return t;
 }
+
 /*
    If you keep all texts in COMMENT, it may exceed the length of MAX_LEXEME.
  */
+
 static Token *cmt(int ch) {
-  // because we first clean tok, so we don't need to delete /* like the below step delete_prev()
-  // to delete that arterisk which is already put into tok buffer.
-  Token *t = &tok;
-  clear_lexeme();
-  
-  switch (ch) {
-    // if It's double slash, then it will read till encounter newline
-  case '/':
-    while (true) {
-      ch = nextch();
-      if (ch == '\n' || ch == '\r') break;
-      outch(ch);
-    }
-    break;
-    // if the subsequent char is arterisk, then it will continue to read until find 
-  case '*':
-    while (true) {
-      ch = nextch();
-      if (ch == '/' && prevch() == '*')
-        { delete_prev(); break;} /* erase '*' */
-      outch(ch);
-    }
-    break;
-    
-  default:
-    break;
-  }
+    Token *t = &tok;
+    clear_lexeme();
 
-  t->sym = CMT;
-  outch(0);
-  return t;
-}
-
-static Token *sep(int ch){
-  Token *t = &tok;
-  char temp[30];
-  int count = 0;
-  int i;
-  int identifier = 0;
-  clear_lexeme();
-  temp[count++] =ch;
-  if (ch == '?'){
-    ch = nextch();
-    temp[count++] = ch;
-    if (ch == ' '){
-      while (true){
-        ch = nextch();
-        temp[count++] = ch;
-        if(codeof(ch) == -1){
+    switch (ch) {
+      case '/':
+        while (true) {
           ch = nextch();
-          temp[count++] = ch;
-              if (ch == ' '){
-                identifier = 1;
-                break;
-              }
-              else
-                break;
+          if (ch == '\n' || ch == '\r') break;
+          outch(ch);
         }
-      }
+        break;
 
-      if (identifier == 1){
-        for(i=0;i<count;i++){
-          outch(temp[i]);
+      case '*':
+        while (true) {
+          ch = nextch();
+          if (ch == '/' && prevch() == '*')
+               { delete_prev(); break;} /* erase '*' */
+          outch(ch);
         }
-        t->sym = tCASE;
-      }
-      else{
-        for(i=count-2;i>=0;i++){
-          backch(ch);
-        }
-      }
+        break;
+
+      default:
+        break;
     }
-    else
-      backch(ch);
-  }
-  else {
-    outch(ch);
-    t->sym = ch;
-  }
-  
-  outch(0);
-  return t; 
+
+    t->sym = CMT;
+    outch(0);
+    return t;
 }
 
 int main() {
-  Token *t;
-  
-  initline();
-  
-  while (true) {
-    // if no input, get out of this loop
-    if ((t = gettoken()) == 0) break;
-    if (t->sym < ID) {
-      // case 1 : when nextch is a seperator 
-      if (isspace(t->sym))
-        printf("%c", t->sym);
-      else
-        printf("SEP<%c> ", t->sym);
-    } else switch (t->sym) {
-      case ID : printf("ID<%s> ", t->text); fflush(stdout); break;
-      case LIT: printf("LIT<%s>(%d) ", t->text, t->ival);fflush(stdout);  break;
-      case OP:  printf("OP<%s>(%d) ", t->text, t->ival); fflush(stdout); break;
-      case CMT: printf("CMT<%s> ", t->text); fflush(stdout); break;
-      case tIF: printf("IF<>"); fflush(stdout); break;
-      case tELSE: printf("ELSE<>"); fflush(stdout); break;
-      case tWHILE: printf("WHILE<>"); fflush(stdout); break;
-      case tDO: printf("DO<>"); fflush(stdout); break;
-      case tFOR: printf("FOR<>"); fflush(stdout); break;
-      case tCALL: printf("CALL<>"); fflush(stdout); break;
-      case tRETURN: printf("RETURN<>"); fflush(stdout); break;
-      case tBREAK: printf("BREAK<>"); fflush(stdout); break;
-      case tCONTINUE: printf("CONTINUE<>"); fflush(stdout); break;
-      case tSWITCH: printf("SWITCH<>"); fflush(stdout); break;
-      case tCASE: printf("CASE<>"); fflush(stdout); break;
-      case tDEFAULT: printf("DEFAULT<>"); fflush(stdout); break;
-      default:  printf("ERROR<%s> ", t->text); fflush(stdout); break;
-      }
-  }
-  printf("\n");
-  return 0;
+    Token *t;
+
+    initline();
+
+    while (true) {
+       if ((t = gettoken()) == 0) break;
+       if (t->sym < ID) {
+           if (isspace(t->sym))
+             printf("%c", t->sym);
+	   else
+             printf("SEP<%c> ", t->sym);
+       } else switch (t->sym) {
+          case ID : printf("ID<%s> ", t->text); break;
+          case LIT: printf("LIT<%s>(%d) ", t->text, t->ival); break;
+          case OP:  printf("OP<%s>(%d) ", t->text, t->ival); break;
+          case CMT: printf("CMT<%s> ", t->text); break;
+          case tIF: printf("IF<>"); break;
+          case tELSE: printf("ELSE<>"); break;
+          case tWHILE: printf("WHILE<>"); break;
+          case tDO: printf("DO<>"); break;
+          case tFOR: printf("FOR<>"); break;
+          case tCALL: printf("CALL<>"); break;
+          case tRETURN: printf("RETURN<>"); break;
+          case tBREAK: printf("BREAK<>"); break;
+          case tCONTINUE: printf("CONTINUE<>"); break;
+          case tSWITCH: printf("SWITCH<>"); break;
+          case tCASE: printf("CASE<>"); break;
+          case tDEFAULT: printf("DEFAULT<>"); break;
+          default:  printf("ERROR<%s> ", t->text); break;
+       }
+    }
+    printf("\n");
+    return 0;
 }
