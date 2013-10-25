@@ -38,7 +38,7 @@ static Token *gettoken0() {
   switch (codeof(ch)) {
   case '+': case '-': case '*': case '/': case '%': case '=':
   case '<': case '>': case '[': case ']': case '&': case '|': 
-  case '!':
+  case '!': case '?': case ':':
     t = op(ch); break;
   case 'Z':
     t = id(ch); break;
@@ -100,64 +100,53 @@ static Token *op(int ch) {
       // we will also read into this char.
       backch(ch2);
       break;
+    case '?':
+    case ':':
+      outch(ch);
+      break;
+    case '-':
+    case '+':
     case '=':
+    case '&':
+    case '|':
       outch(ch);
       ch2 = nextch();
-      if(ch2 == '='){
-        outch(ch);
+	  if (ch == ch2 || ch2 == '='){
+          outch(ch2);
+          break;
+      }
+      backch(ch2);
+      break;
+    case '<':
+    case '>':
+      outch(ch);
+      ch2 = nextch();
+      if (ch2 == ch){
+        outch(ch2);
         ch3 = nextch();
-        if (ch3=='='){
-          outch(ch);
+        if(ch3 == '='){
+          outch(ch3);
           break;
         }
         backch(ch3);
         break;
       }
+      if (ch2 == '='){
+        outch(ch2);
+        break;
+      }
       backch(ch2);
       break;
-    case '+':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='+'){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '-':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='-'){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
     case '*':
+    case '!':
       outch(ch);
       ch2 = nextch();
-      if(ch2=='*'){
+      if (ch2 == '='){
         outch(ch2);
         break;
       }
-      backch(ch2);break;
-    case '%':
-      outch(ch);
+      backch(ch2);
       break;
-    case '<':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='='){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
-    case '>':
-      outch(ch);
-      ch2 = nextch();
-      if(ch2=='='){
-        outch(ch2);
-        break;
-      }
-      backch(ch2);break;
     default: 
       t->sym == ERROR;
       t->ival = 0;
@@ -260,43 +249,33 @@ static Token *sep(int ch){
   int i;
   int identifier = 0;
   clear_lexeme();
-  temp[count++] =ch;
   if (ch == '?'){
-    ch = nextch();
     temp[count++] = ch;
-    if (ch == ' '){
-      while (true){
-        ch = nextch();
-        temp[count++] = ch;
-        if(codeof(ch) == -1){
-          ch = nextch();
-          temp[count++] = ch;
-              if (ch == ' '){
-                identifier = 1;
-                break;
-              }
-              else
-                break;
-        }
+    while (count<30){
+      ch = nextch();
+      temp[count++] = ch;
+      if (ch == ':'){
+        identifier = 1;
+        break;
       }
-
-      if (identifier == 1){
-        for(i=0;i<count;i++){
-          outch(temp[i]);
-        }
-        t->sym = tCASE;
-      }
-      else{
-        for(i=count-2;i>=0;i++){
-          backch(ch);
-        }
+      if (ch == '\n'){
+        break;
       }
     }
-    else
-      backch(ch);
+    if (identifier == 1){
+      for(i=0;i<count;i++){
+        outch(temp[i]);
+      }
+      t->sym = EXPR;
+    }
+    else{
+      for(i=count-1;i>=0;i--){
+        backch(temp[i]);
+      }
+      t->sym = ch;
+    }
   }
-  else {
-    outch(ch);
+  else{
     t->sym = ch;
   }
   
@@ -323,6 +302,7 @@ int main() {
       case LIT: printf("LIT<%s>(%d) ", t->text, t->ival);fflush(stdout);  break;
       case OP:  printf("OP<%s>(%d) ", t->text, t->ival); fflush(stdout); break;
       case CMT: printf("CMT<%s> ", t->text); fflush(stdout); break;
+      case EXPR: printf("EXPR<%s> ",t->text);break;
       case tIF: printf("IF<>"); fflush(stdout); break;
       case tELSE: printf("ELSE<>"); fflush(stdout); break;
       case tWHILE: printf("WHILE<>"); fflush(stdout); break;
@@ -335,6 +315,30 @@ int main() {
       case tSWITCH: printf("SWITCH<>"); fflush(stdout); break;
       case tCASE: printf("CASE<>"); fflush(stdout); break;
       case tDEFAULT: printf("DEFAULT<>"); fflush(stdout); break;
+      case tVOID: printf("VOID<>");break;
+      case tCHAR: printf("CHAR<>");break;
+      case tSHORT: printf("SHORT<>");break;
+      case tINT: printf("INT<>");break;
+      case tLONG: printf("LONG<>");break;
+      case tFLOAT: printf("FLOAT<>");break;
+      case tDOUBLE: printf("Double<>");break;
+      case tAUTO: printf("AUTO<>");break;
+      case tSTATIC: printf("STATIC<>");break;
+      case tCONST: printf("CONST<>");break;
+      case tSIGNED: printf("SIGNED<>");break;
+      case tUNSIGNED: printf("UNSIGNED<>");break;
+      case tEXTERN: printf("EXTERN<>");break;
+      case tVOLATILE: printf("VOLATILE<>");break;
+      case tREGISTER: printf("REGISTRE<>");break;
+      case tGOTO: printf("GOTO<>");break;
+      case tTYPEDEF: printf("TYPEDEF<>");break;
+      case tSTRUCT: printf("STRUCT<>");break;
+      case tENUM: printf("ENUM<>");break;
+      case tUNION: printf("UNION<>");break;
+      case tSIZEOF: printf("SIZEOF<>");break;
+      case tINLINE: printf("INLINE<>");break;
+      case tRESTRICT: printf("RESTRICT<>");break;
+        
       default:  printf("ERROR<%s> ", t->text); fflush(stdout); break;
       }
   }
