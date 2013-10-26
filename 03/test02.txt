@@ -1,0 +1,4 @@
+foo;
+foo(x);
+foo(x,y);
+foo(x,y,z);

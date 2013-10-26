@@ -1,0 +1,7 @@
+/* Test */
+a = 3;
+b = 4  /* ; is missing */
+call foo (a, b) ;
+call foo (a  b) ; /* , is missing */
+call foo (a, b  ; /* ) is missing */
+c = 5 ;
